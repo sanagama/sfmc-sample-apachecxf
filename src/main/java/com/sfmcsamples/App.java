@@ -80,22 +80,102 @@ public class App
   
     private void SendEmail(Soap soapClient)
     {
-        // Create an e-mail
-        Email email = new Email();
-        email.setName("Test from Apache CXF");
-        email.setStatus("Test from Apache CXF");
-        email.setSubject("Test from Apache CXF");
-        email.setCharacterSet("UTF-8");
-        email.setHTMLBody("<html><body>this is a test email from the Java Apache CXF sample</body></html>");
+        String toEmailAddress = "sanagama2@gmail.com";
+        String fromEmailAddress = "sanagama2@gmail.com";
+        String customerKey = "Apache-CXF-Test";
 
-        CreateRequest createRequest = new CreateRequest();
-        createRequest.getObjects().addAll(Arrays.asList( new APIObject[] {email} ));
-        createRequest.setOptions(new CreateOptions());
-        CreateResponse response = soapClient.create(createRequest);
-        LOGGER.info("overall status = " + response.getOverallStatus());
-        for (CreateResult result : response.getResults())
+        // Create TriggeredSendDefinition and initialize the TriggeredSend
+        LOGGER.info("Creating TriggeredSendDefinition...");
+        TriggeredSendDefinition tsd = new TriggeredSendDefinition();
+    	tsd.setCustomerKey( customerKey );
+    	TriggeredSend triggeredSend = new TriggeredSend();
+    	triggeredSend.setTriggeredSendDefinition(tsd);
+
+    	// Create a Subscriber
+        LOGGER.info("Creating Subscriber...");
+    	Subscriber subscriber = new Subscriber();
+    	subscriber.setEmailAddress(toEmailAddress);
+        subscriber.setSubscriberKey(customerKey);
+
+/*        
+    	Owner ownerSubscriber = new Owner();
+    	ownerSubscriber.setFromAddress( validFromAddress );
+    	ownerSubscriber.setFromName( validFromName );
+    	subscriber.setOwner( ownerSubscriber );
+*/
+    	//Populate array of Subscribers
+        testArray[0] = subscriber;
+        testArray[1] = subscriberInvalid;
+        java.util.List<Subscriber> list = Arrays.asList( testArray );        
+        triggeredSend.getSubscribers().addAll( list );
+
+        // Create an e-mail
+        LOGGER.info("Creating a new Email...");
+        Email newEmail = new Email();
+        newEmail.setName(customerKey);
+        newEmail.setSubject(customerKey);
+        newEmail.setHTMLBody("<html><body>this is a test email from the Java Apache CXF sample</body></html>");
+        String newObjectIdEmail = createObjectHelper(soapClient, newEmail);
+
+        // Create a Send object
+        LOGGER.info("Creating a new Send...");
+        EmailSendDefinition sendDefinition = new EmailSendDefinition();
+        sendDefinition.setCustomerKey(customerKey);
+        //sendDefinition
+        Send newSend = new Send();
+        newSend.setEmail(newEmail);
+        newSend.setCustomerKey(customerKey);
+        newSend.setFromAddress("sanagama2@gmail.com");
+        newSend.setFromName("Sanjay Nagamangalam");
+        newSend.setEmailSendDefinition(sendDefinition);
+        String newObjectIdSend = createObjectHelper(soapClient, newSend);
+
+        PerformRequestMsg performRequestMsg = new PerformRequestMsg();
+        performRequestMsg.setOptions(new PerformOptions());
+        performRequestMsg.setAction("start");
+        //performRequestMsg.setDefinitions( new EmailSendDefinition[]{definition});
+        //This sends email using User-Initiated-Email-definition.
+        PerformResponseMsg responseMsg = soapClient.perform(performRequestMsg);
+        System.out.println(responseMsg.getOverallStatus());
+
+    	// Create a new Subscriber
+    	Subscriber newSubscriber = new Subscriber();
+        newSubscriber.setEmailAddress(fromEmailAddress);
+        String newSubscriberKey = createObjectHelper(soapClient, newSubscriber);
+        
+        TriggeredSendDefinition triggeredSendDefinition = new TriggeredSendDefinition();
+    	triggeredSendDefinition.setCustomerKey( customerKey );
+    	TriggeredSend triggeredSend = new TriggeredSend();
+        triggeredSend.setTriggeredSendDefinition(triggeredSendDefinition);
+    }
+
+    private String createObjectHelper(Soap soapClient, APIObject object)
+    {
+        String newObjectId = "";
+        try
         {
-            LOGGER.info("status code = " + result.getStatusCode() + ", status message = " + result.getStatusMessage());
+            CreateRequest createRequest = new CreateRequest();
+            createRequest.getObjects().addAll(Arrays.asList( new APIObject[] {object} ));
+            createRequest.setOptions(new CreateOptions());
+
+            CreateResponse response = soapClient.create(createRequest);
+            String overallStatus = response.getOverallStatus();
+            CreateResult result = response.getResults().get(0); // get the first and only result from the list of results
+            newObjectId = result.getNewObjectID();
+
+            LOGGER.info("overall status = " + overallStatus);
+            if(overallStatus != "OK")
+            {
+                LOGGER.info("status code = " + result.getStatusCode() + 
+                            ", status message = " + result.getStatusMessage() +
+                            ", NewID = " + result.getNewID() +
+                            ", NewObjectID = " + result.getNewObjectID());
+            }
         }
+        catch(Exception ex)
+        {
+            LOGGER.severe(ex.getMessage());
+        }
+        return newObjectId; 
     }
 }
